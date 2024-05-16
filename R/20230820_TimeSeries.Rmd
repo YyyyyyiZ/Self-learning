@@ -1,0 +1,285 @@
+---
+title: "Time Series"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+```{r}
+kings <- scan("http://robjhyndman.com/tsdldata/misc/kings.dat", skip = 3)
+kingstimeseries <- ts(kings)
+kingstimeseries
+```
+月度数据frequency=12
+季度数据frequency=4
+```{r}
+births<- scan("http://robjhyndman.com/tsdldata/data/nybirths.dat")
+birthstimeseries<-ts(births,frequency=12,start=c(1946,1)) 
+```
+
+```{r}
+souvenir <- scan("http://robjhyndman.com/tsdldata/data/fancy.dat")
+souvenirtimeseries <- ts(souvenir, frequency=12, start=c(1987,1))
+souvenirtimeseries
+```
+
+```{r}
+plot.ts(kingstimeseries)
+plot.ts(birthstimeseries)
+plot.ts(souvenirtimeseries)
+logsouvenirtimeseries <- log(souvenirtimeseries)
+plot.ts(logsouvenirtimeseries)
+```
+# 分解趋势性数据
+简单移动平滑
+```{r}
+library(TTR)
+kingstimeseriesSMA3 <- SMA(kingstimeseries, n = 3)
+kingstimeseriesSMA8 <- SMA(kingstimeseries, n = 8)
+```
+
+# 分解季节性数据
+```{r}
+birthstimeseriescomponents <- decompose(birthstimeseries)
+birthstimeseriescomponents$seasonal
+```
+
+```{r}
+plot(birthstimeseriescomponents)
+```
+
+季节性修正时间序列
+```{r}
+birthstimeseriesseasonallyadjusted <- birthstimeseries - birthstimeseriescomponents$seasonal
+plot(birthstimeseriesseasonallyadjusted)
+```
+
+# 指数平滑法进行预测
+## 简单指数平滑法
+```{r}
+rain <- scan("http://robjhyndman.com/tsdldata/hurst/precip1.dat",skip=1)
+rainseries <- ts(rain,start=c(1813))
+plot.ts(rainseries)
+```
+
+```{r}
+rainseriesforecasts <- HoltWinters(rainseries, beta=FALSE, gamma=FALSE)
+rainseriesforecasts
+```
+
+HoltWinters（）的输出告诉我们alpha参数的估计值约为0.024。这非常接近零，告诉我们预测是基于最近和最近的观察结果（虽然对最近的观察更加重视）。
+
+默认情况下，HoltWinters（）仅对我们原始时间序列所涵盖的相同时间段进行预测。在这种情况下，我们的原始时间序列包括1813年至1912年伦敦的降雨量，所以预测也是1813年至1912年。
+
+在上面的例子中，我们将HoltWinters（）函数的输出存储在列表变量“rainseriesforecasts”中。HoltWinters（）的预测存储在这个名为“fits”的列表变量的命名元素中，因此我们可以通过输入以下内容来获取它们的值：
+
+```{r}
+rainseriesforecasts$fitted
+plot(rainseriesforecasts)
+```
+
+```{r}
+HoltWinters(rainseries, beta = FALSE, gamma = FALSE, l.start = 23.56)
+```
+
+蓝色线条是1913-1920预测降雨量，紫色阴影为80%置信区间，灰色为95%置信区间
+```{r}
+library(forecast)
+rainseriesforecasts2 <- forecast(rainseriesforecasts, h = 8)
+plot(rainseriesforecasts2)
+```
+计算样本内预测误差延迟1-20阶的相关图
+```{r}
+acf(rainseriesforecasts2$residuals, na.action = na.pass, lag.max = 20)
+```
+自相关系数在3阶时触及置信区间
+
+检验样本内预测误差在滞后1-20阶是非零自相关的
+p-value不足以证明预测误差在滞后1-20阶是非零自相关的
+```{r}
+Box.test(rainseriesforecasts2$residuals, lag = 20, type = "Ljung-Box")
+```
+
+预测误差是否正态分布
+```{r}
+plot.ts(rainseriesforecasts2$residuals)
+```
+从图中可以看出，样本内的预测误差随时间的变化似乎大致是恒定的，Ljung-Box检验表明，样本内预测误差不存在非零的自相关，预测误差的分布呈正态分布，均值为零。这表明，简单指数平滑法为伦敦降雨量提供了一个足够的预测模型，这可能是无法改进的。此外，80%和95%预测区间所基于的假设(预测误差不存在自相关，预测误差呈正态分布，均值为零，方差恒定)可能是有效的。
+
+```{r}
+plotForecastErrors <- function(forecasterrors)
+{
+  # make a red histogram of the forecasterrors:
+  mybinsize <- IQR(forecasterrors)/4
+  mymin <- min(forecasterrors)*3
+  mymax <- max(forecasterrors)*3
+  mybins <- seq(mymin, mymax, mybinsize)
+  hist(forecasterrors, col="red", freq=FALSE,breaks=mybins)
+  # freq=FALSE ensures the area under thehistogram = 1
+  mysd <- sd(forecasterrors)
+  # generate normally distributed data with mean 0and standard deviation mysd
+  mynorm <- rnorm(10000, mean=0, sd=mysd)
+  myhist <- hist(mynorm, plot=FALSE,breaks=mybins)
+  # plot the normal curve as a blue line on top ofthe histogram of forecast errors:
+  points(myhist$mids, myhist$density, type="l",col="blue", lwd=2)
+}
+plotForecastErrors(rainseriesforecasts2$residuals)
+```
+
+
+## Holt指数平滑
+```{r}
+skirts <- scan("http://robjhyndman.com/tsdldata/roberts/skirts.dat",skip=5)
+skirtserie<-ts(skirts,start = 1866)
+plot(skirtserie)
+```
+
+```{r}
+skirts_forecast<-HoltWinters(skirtserie,gamma = FALSE)
+skirts_forecast
+```
+
+```{r}
+plot(skirts_forecast)
+```
+
+
+```{r}
+skirts_forecast2<-HoltWinters(skirtserie,gamma = FALSE,l.start = 608,b.start = 9)
+skirts_forecast2
+```
+
+```{r}
+plot(skirts_forecast2)
+```
+
+
+```{r}
+skirts_forecast2.forecast <- forecast(skirts_forecast2, h = 19)
+plot(skirts_forecast2.forecast)
+```
+
+```{r}
+acf(skirts_forecast2.forecast$residuals, na.action = na.pass, lag.max = 20)
+Box.test(skirts_forecast2.forecast$residuals,lag = 20,type = "Ljung-Box")
+```
+因此，Ljung-Box检验表明，预测误差中几乎没有自相关的证据，而预测误差的时间图和直方图表明，预测误差呈正态分布，均值为零，方差恒定，是可信的。因此，我们可以得出结论，霍尔特指数平滑为裙子下摆直径提供了一个足够的预测模型，这可能是无法改进的。此外，这意味着80%和95%预测区间所基于的假设可能是有效的。
+
+
+## Holt-Winters指数平滑法
+```{r}
+souvenir <- scan("http://robjhyndman.com/tsdldata/data/fancy.dat")
+souvenirseries<-ts(souvenir,frequency = 12,start = c(1987,1))
+logsouvenir<-log(souvenirseries)
+logsouvenirholt<-HoltWinters(logsouvenir)
+plot(logsouvenirholt)
+```
+
+```{r}
+logsouvenirholtforecast<-forecast(logsouvenirholt, h = 48)
+plot(logsouvenirholtforecast)
+```
+
+```{r}
+acf(logsouvenirholtforecast$residuals, na.action = na.pass, lag.max = 20)
+Box.test(logsouvenirholtforecast$residuals,lag = 20,type = "Ljung-Box")
+```
+因此，预测误差在滞后1-20时几乎没有自相关的证据，预测误差随时间呈正态分布，均值为零，方差为常数。这表明，霍尔特-温特斯指数平滑提供了一个充分的预测模型的销售日志在纪念品商店，这可能是无法改善。此外，预测区间所依据的假设可能是有效的。
+
+# ARIMA模型
+考虑数据间的相关性
+对时间序列进行差分得到平稳序列
+```{r}
+skirtseriesdiff1 <- diff(skirtserie, differences = 1)
+plot.ts(skirtseriesdiff1)
+```
+
+```{r}
+skirtseriesdiff2 <- diff(skirtserie, differences = 2)
+plot.ts(skirtseriesdiff2)
+```
+
+```{r}
+kingstimeseriesdiff1 <- diff(kingstimeseries, differences = 1)
+plot.ts(kingstimeseriesdiff1)
+```
+
+```{r}
+acf(kingstimeseriesdiff1, lag.max = 20)
+acf(kingstimeseriesdiff1, lag.max = 20, plot = FALSE)
+```
+
+```{r}
+pacf(kingstimeseriesdiff1, lag.max = 20)
+pacf(kingstimeseriesdiff1, lag.max = 20, plot = FALSE)
+```
+偏相关图显示滞后1,2和3的部分自相关超过显着边界，为负，并且随着滞后的增加而在幅度上缓慢下降（滞后1：-0.360，滞后2：-0.335，滞后3：-0.321 ）。在滞后3之后，部分自相关变为零。
+由于在滞后1之后相关图为零，并且在滞后3之后部分相关图变为零，这意味着对于第一差异的时间序列，以下ARMA（自回归移动平均）模型是可能的：
+ARMA（3,0）模型，即阶数为p = 3 的自回归模型，因为部分自相关图在滞后3之后为零，并且自相关图结束为零（尽管可能过于突然，因为该模型是合适的）
+一个ARMA（0,1）模型，即q = 1 的移动平均模型，因为自相关图在滞后1之后为零，而部分自相关图结束为零
+一个ARMA（p，q）模型，即p和q大于0的混合模型，因为自相关图和部分相关图尾部为零（尽管相关图可能会突然变为零，因为该模型是合适的）
+
+```{r}
+volcanodust <- scan("http://robjhyndman.com/tsdldata/annual/dvi.dat", skip=1)
+volcanodustseries <- ts(volcanodust,start=c(1500))
+plot.ts(volcanodustseries)
+```
+
+```{r}
+acf(volcanodustseries, lag.max=20) # plot a correlogram
+acf(volcanodustseries, lag.max=20, plot=FALSE) # get the values of the autocorrelations
+```
+我们从相关图中看到滞后1,2和3的自相关超过了显着边界，并且在滞后3之后自相关变为零。滞后1,2,3的自相关是正的，并且随着增加而减小幅度滞后（滞后1：0.666，滞后2：0.374，滞后3：0.162）。
+
+滞后19和20的自相关也超过了显着性边界，但很可能这是偶然的，因为它们刚超过显着性界限（特别是对于滞后19），滞后4-18的自相关不超过显着性边界，我们预计仅在偶然的情况下，20分中有1分超过95％的显着性界限。
+
+```{r}
+pacf(volcanodustseries, lag.max=20)
+pacf(volcanodustseries, lag.max=20, plot=FALSE)
+```
+从部分自相关图中，我们看到滞后1处的部分自相关是正的并且超过了显着性边界（0.666），而滞后2处的部分自相关是负的并且也超过了显着性边界（-0.126）。滞后2后，部分自相关减为零。
+
+由于在滞后3之后相关图关闭为零，并且在滞后2之后部分相关图为零，因此以下ARMA模型可用于时间序列：
+
+一个ARMA（2,0）模型，因为部分自相关图在滞后2之后为零，并且相关图在滞后3之后趋于零，并且部分相关图在滞后2之后为零
+一个ARMA（0,3）模型，因为自相关图在滞后3之后为零，而部分相关图结束为零（尽管可能过于突然，因为这个模型是合适的）
+一个ARMA（p，q）混合模型，因为相关图和部分相关图尾部为零（尽管部分相关图可能会突然断尾，因为这个模型是合适的）
+
+```{r}
+kingstimeseriesarima <- arima(kingstimeseries, order=c(0,1,1)) # fit an ARIMA(0,1,1) model
+kingstimeseriesarima
+```
+
+```{r}
+kingstimeseriesforecasts <- forecast(kingstimeseriesarima, h=5)
+plot(kingstimeseriesforecasts)
+```
+
+```{r}
+acf(kingstimeseriesforecasts$residuals, lag.max=20)
+Box.test(kingstimeseriesforecasts$residuals, lag=20, type="Ljung-Box")
+```
+样本内预测误差的时间图表明，预测误差的方差似乎随着时间的推移大致不变（尽管时间序列的后半部分的方差可能略高）。时间序列的直方图显示预测误差大致正态分布，均值似乎接近于零。因此，预测误差通常以均值零和常数方差分布是合理的。
+
+由于连续的预测误差似乎没有相关性，并且预测误差似乎正常分布为均值为零且方差不变，因此ARIMA（0,1,1）似乎确实为死亡年龄提供了充分的预测模型。
+
+
+```{r}
+volcanodustseriesarima <- arima(volcanodustseries, order = c(2, 0, 0))
+volcanodustseriesarima
+```
+
+```{r}
+volcanodustseriesforcast <- forecast(volcanodustseriesarima, h = 31)
+plot(volcanodustseriesforcast)
+```
+
+```{r}
+acf(volcanodustseriesforcast$residuals, lag.max=20)
+Box.test(volcanodustseriesforcast$residuals, lag=20, type="Ljung-Box")
+```
+
+```{r}
+plotForecastErrors(volcanodustseriesforcast$residuals)
+```
+

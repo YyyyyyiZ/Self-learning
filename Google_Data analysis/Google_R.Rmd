@@ -1,0 +1,192 @@
+---
+title: "Google_R"
+author: "Yi Zhang"
+date: "2023-07-24"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r penguins}
+library(palmerpenguins)
+colnames(penguins)
+```
+
+```{r}
+library(tidyverse)
+penguins %>%
+  select(species)
+```
+
+select()
+rename()
+rename_with()
+clean_names()
+```{r}
+penguins %>%
+  select(-species)
+```
+
+```{r}
+penguins %>%
+  rename(island_new=island)
+```
+
+```{r}
+rename_with(penguins,tolower)
+```
+
+arrange()
+filter()
+unite()
+separate()
+mutate()
+```{r}
+penguins %>%
+  arrange(-bill_length_mm)   ## 按照bill_length_mm降序
+```
+
+```{r}
+penguins %>% 
+  group_by(island) %>%
+  drop_na() %>%
+  summarise(mean_bill_length_mm=mean(bill_length_mm))
+```
+
+```{r}
+penguins %>% 
+  group_by(island) %>%
+  drop_na() %>%
+  summarise(max_bl = max(bill_length_mm), mean_bl_mm=mean(bill_length_mm))
+```
+
+```{r}
+penguins %>%
+  filter(species=="Adelie")
+```
+
+```{r}
+penguins <- unite(penguins, 'combined', species, island, sep = ' ')
+penguins
+```
+
+```{r}
+penguins <- separate(penguins, combined, into = c('species', 'island'), sep = ' ')
+penguins
+```
+
+```{r}
+penguins %>%
+  mutate(body_mass_kg = body_mass_g/1000)
+```
+
+```{r}
+library(Tmisc)
+
+quartet %>%
+  group_by(set) %>%
+  summarise(mean(x), sd(x), mean(y), sd(y), cor(x, y))
+```
+
+```{r}
+ggplot(quartet, aes(x, y)) + geom_point() + 
+  geom_smooth(method = lm, se = FALSE) + 
+  facet_wrap(~set)
+```
+
+```{r}
+library(datasauRus)
+
+ggplot(datasaurus_dozen, aes(x=x, y=y, colour = dataset))+
+  geom_point()+theme_void()+
+  theme(legend.position = "none")+
+  facet_wrap(~dataset,ncol=3)
+```
+bias()
+```{r}
+library(SimDesign)
+actual_temp <- c(68.3, 70, 72.4, 71, 67, 70)
+predicted_temp <- c(67.9, 69, 71.5, 70, 67, 69)
+bias(actual_temp, predicted_temp)
+```
+
+visualization
+ggplot2
+grammar of graphics
+```{r}
+ggplot(data = penguins)+
+  geom_point(mapping = 
+               aes(x=flipper_length_mm,y=body_mass_g, color=species,shape=species, alpha=species, size=species))
+```
+
+```{r}
+ggplot(data = penguins)+
+  geom_point(mapping = 
+               aes(x=flipper_length_mm,y=body_mass_g), color="purple")
+```
+geom_function
+```{r}
+ggplot(data = penguins) + 
+  geom_smooth(mapping = aes(x = flipper_length_mm,y = body_mass_g)) + 
+  geom_point(mapping = aes(x = flipper_length_mm,y = body_mass_g))
+```
+
+```{r}
+ggplot(data = penguins) + 
+  geom_smooth(mapping = aes(x = flipper_length_mm,y = body_mass_g, linetype=species))
+```
+
+```{r}
+ggplot(data = penguins) + 
+  geom_smooth(mapping = aes(x = flipper_length_mm,y = body_mass_g)) + 
+  geom_jitter(mapping = aes(x = flipper_length_mm,y = body_mass_g))
+```
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x=cut, color = cut))
+```
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x=cut, fill = cut))
+```
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x=cut, fill = clarity))
+```
+facet_wrap()
+facet_grid()
+```{r}
+ggplot(data = penguins) + 
+  geom_point(mapping = aes(x = flipper_length_mm,y = body_mass_g, color=species)) + 
+  facet_wrap(~species) + 
+  labs(title = "Palmer Penguins: Body Mass vs. Flipper Length", subtitle = "Sample of Three Penguin Species", caption = "Data collected by Dr. Kristen Gorman") + 
+  annotate("text", x=200, y=3500, label = "The Gentoos are the largest", color = "purple", fontface="bold", size=3, angle=25)
+```
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x=color, fill = cut)) + 
+  facet_wrap(~cut)
+```
+
+```{r}
+ggplot(data = penguins) + 
+  geom_point(mapping = aes(x = flipper_length_mm,y = body_mass_g, color=species)) + 
+  facet_wrap(sex~species)
+```
+
+```{r}
+p<-ggplot(data = penguins) + 
+  geom_point(mapping = aes(x = flipper_length_mm,y = body_mass_g, color=species)) + 
+  labs(title = "Palmer Penguins: Body Mass vs. Flipper Length", subtitle = "Sample of Three Penguin Species", caption = "Data collected by Dr. Kristen Gorman")
+
+p + annotate("text", x=210, y=3500, label = "The Gentoos are the largest", color = "purple", fontface="bold", size=3)
+```
+
+```{r}
+ggsave("Penguins.png")
+```

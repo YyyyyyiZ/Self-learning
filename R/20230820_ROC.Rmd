@@ -1,0 +1,53 @@
+---
+title: "ROC"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+患病率，先验概率
+敏感性=TPR
+1-特异性=FNR=1-TNR
+曲线下面积
+```{r}
+example <- read.table("example21_2.csv", header = TRUE, sep = ",")
+attach(example)
+```
+
+group为真实分类
+```{r}
+library(ROCR)
+pred <- prediction(example$value, example$group)
+pred
+```
+
+```{r}
+pref <- performance(pred, "tpr", "fpr")
+plot(perf, col = "red")
+abline(a = 0, b = 1, col = "blue")
+```
+
+```{r}
+perf1 <- performance(pred, "prec", "rec")
+plot(perf1)
+```
+
+```{r}
+perf2 <- performance(pred, "sens", "spec")
+plot(perf2)
+```
+
+```{r}
+auc <- performance(pred, "auc")
+auc
+detach(example)
+```
+
+```{r}
+fit1 <- glm(oncology ~ mRNA + dna, family = binomial(), data = example)
+example$predvalue <- predict(fit1, type = "response")
+pred <- prediction(example$predvalue, example$oncology)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf)
+```
+

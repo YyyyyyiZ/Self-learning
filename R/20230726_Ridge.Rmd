@@ -1,0 +1,189 @@
+---
+title: "Ridge"
+author: "Yi Zhang"
+date: "2023-07-26"
+---
+
+经验风险最小化能够保证得到很好的学习效率
+训练集较小，容易产生过拟合
+```{r}
+library(datasets)
+data(mtcars)
+str(mtcars)
+```
+
+```{r}
+library(car) # package to calculate VIF
+library(corrplot) # correlation plots
+library(leaps) # best subsets regression
+library(glmnet) # allows ridge, lasso, elastic network
+library(caret) # help identify appropriate parameters
+```
+
+```{r}
+library(ElemStatLearn)
+data(prostate)
+plot(prostate)
+```
+
+```{r}
+plot(mtcars)
+```
+```{r}
+p.cor = cor(mtcars)
+corrplot.mixed(p.cor)
+```
+```{r}
+set.seed(123)
+ind <- sample(2, nrow(mtcars), replace = TRUE, prob = c(0.7, 0.3))
+train <- mtcars[ind==1,]
+test <- mtcars[ind==2,]
+str(test)
+```
+
+# 最优子集
+适合变量个数比较小的情况
+```{r}
+subfit <- regsubsets(mpg ~ ., data = train)
+b.sum <- summary(subfit)
+which.min(b.sum$bic) # 贝叶斯信息准则，越小说明模型越优
+```
+```{r}
+plot(b.sum$bic, type = 'l', xlab = "# of features", ylab = "BIC", main = "BIC score")
+```
+```{r}
+plot(subfit, scale = "bic", main = "Best subset features")
+```
+cyl and wt
+
+```{r}
+ols <- lm(mpg ~ cyl + wt, data = train)
+plot(ols$fitted.values, train$mpg, xlab = "Predicted", ylab = "Actual", main = "Predicted vs. Actual")
+abline(0,1,col=2)
+```
+
+
+```{r}
+pred.subfit = predict(ols, newdata = test)
+plot(pred.subfit, test$mpg, xlab = "Predicted", ylab = "Actual", main = "Predicted vs. Actual")
+abline(0, 1, col = 2)
+```
+```{r}
+resid.subfit <- test$mpg - pred.subfit
+mean(resid.subfit^2)
+```
+
+# 岭回归L2-norm
+```{r}
+x <- as.matrix(train[, 2:11])
+y <- train[,1]
+ridge <- glmnet(x, y, family = "gaussian", alpha = 0)
+print(ridge)
+```
+
+```{r}
+plot(ridge, label = TRUE)
+```
+
+```{r}
+plot(ridge, xvar = "lambda", label = TRUE)
+```
+```{r}
+ridge.coef <- predict(ridge, s=0.1, type = "coefficients")
+ridge.coef
+```
+
+```{r}
+newx <- as.matrix(test[, 2:11])
+ridge.y <- predict(ridge, newx = newx, type = "response", s=0.1)
+plot(ridge.y, test$mpg, xlab = "Predicted", ylab = "Actual", main = "Ridge Regression")
+```
+```{r}
+ridge.resid <- ridge.y - test$mpg
+mean(ridge.resid^2)
+```
+
+# Lasso回归L1-norm
+可以使特征权重收缩到0
+可以进行特征选择，提高模型的解释性
+```{r}
+lasso <- glmnet(x, y, family = "gaussian", alpha = 1)
+print(lasso)
+```
+
+```{r}
+plot(lasso, label = TRUE)
+```
+
+```{r}
+plot(lasso, xvar = "lambda", label = TRUE)
+```
+
+```{r}
+lasso.coef <- predict(lasso, s=0.1, type = "coefficients")
+lasso.coef
+```
+
+```{r}
+lasso.y <- predict(lasso, newx = newx, type = "response", s=0.1)
+plot(lasso.y, test$mpg, xlab = "Predicted", ylab = "Actual", main = "Lasso Regression")
+```
+
+```{r}
+lasso.resid <- lasso.y - test$mpg
+mean(lasso.resid^2)
+```
+# 弹性网络
+当\alpha=0，等价于Ridge
+当\alpha=1，等价于Lasso
+```{r}
+grid <- expand.grid(.alpha = seq(0, 1, by = .2),
+                    .lambda = seq(0.00, 0.2, by = 0.02))
+table(grid)
+```
+
+
+```{r}
+control <- trainControl(method = "LOOCV") # selectionFunction="best"
+```
+
+```{r}
+set.seed(123)
+enet.train <- train(mpg ~ ., data = train,
+                    method = "glmnet",
+                    trControl = control,
+                    tuneGrid = grid)
+enet.train
+```
+```{r}
+enet <- glmnet(x,y, family = "gaussian", alpha = 0,lambda = 0.08)
+enet.coef <- coef(enet, s = 0.08, exact = TRUE)
+enet.coef
+enet.y <- predict(enet, newx = newx, type = "response", s = .08)
+plot(enet.y, test$mpg, xlab = "Predicted", ylab = "Actual", main = "Elastic Net")
+```
+```{r}
+enet.resid <- enet.y - test$mpg
+mean(enet.resid^2)
+```
+
+# 交叉验证
+```{r}
+set.seed(123)
+lasso.cv <- cv.glmnet(x, y, nfolds = 3)
+plot(lasso.cv)
+```
+
+```{r}
+lasso.cv$lambda.min
+lasso.cv$lambda.lse
+```
+
+```{r}
+coef(lasso.cv, s = "lambda.min")
+```
+```{r}
+lasso.y.cv <- predict(lasso.cv, newx = newx, type = "response", s = "lambda.min")
+lasso.cv.resid <- lasso.y.cv - test$mpg
+mean(lasso.cv.resid^2)
+```

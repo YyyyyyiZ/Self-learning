@@ -1,0 +1,44 @@
+---
+title: "EFA"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+```{r}
+library(psych)
+covariances <- ability.cov$cov
+# 协方差矩阵变为相关系数矩阵
+correlations <- cov2cor(covariances)
+correlations
+```
+
+```{r}
+fa.parallel(correlations, n.obs = 112, fa = "both", n.iter = 100,
+            main = "Scree plot with parallel analysis")
+abline(h=0, lwd = 1, col = "green")
+```
+```{r}
+fa <- fa(correlations, nfactors = 2, rotate = "none", fm = "pa")
+fa
+```
+最大方差旋转
+```{r}
+fa.varimax <- fa(correlations, nfactors = 2, rotate = "varimax", fm = "pa")
+fa.varimax
+```
+斜交旋转
+```{r}
+library(GPArotation)
+fa.promax <- fa(correlations, nfactors = 2, rotate = "promax", fm = "pa")
+fa.promax
+```
+
+```{r}
+fa2 <- fa(correlations, nfactors = 2, rotate = "varimax", fm = "ml", score = TRUE)
+fa2$weight
+fa2$scores
+factor.plot(fa2, labels = rownames(fa$loadings))
+fa.diagram(fa2, simple = FALSE)
+```
+

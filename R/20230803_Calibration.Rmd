@@ -1,0 +1,62 @@
+---
+title: "Calibration"
+author: "Yi Zhang"
+date: "2023-08-03"
+output: html_document
+---
+
+```{r}
+library(rms)
+library(survival)
+data(lung)
+```
+```{r}
+lung$sex <- factor(lung$sex, levels = c(1, 2), labels = c("male", "female"))
+dd = datadist(lung)
+options(datadist= "dd")
+```
+
+```{r}
+f1 <- lrm(status ~ age + sex, data = lung)
+nom <- nomogram(f1, fun = function(x)1/(1+exp(-x)), lp = F, funlabel = "Risk")
+plot(nom)
+```
+
+```{r}
+f2 <- psm(Surv(time, status) ~ age + sex, data = lung, dist = "lognormal")
+medi <- Quantile(f2)
+surv <- Survival(f2)
+```
+
+```{r}
+nom1 <-nomogram(f2, fun = function(x) medi(lp = x), funlabel = "Median Survival")
+plot(nom1)
+```
+
+
+```{r}
+nom2 <- nomogram(f2, fun = list(function(x) surv(365, x), 
+                               function(x) surv(730, x)),
+                funlabel = c("1-year survival probs", "2-year survival probs")
+                )
+plot(nom2, xfrac = 0.6)
+```
+
+```{r}
+# 计算C-index
+rcorrcens(Surv(time, status) ~ predict(f2), data = lung)
+# f2 <- psm(Surv(time, status) ~ age + sex, data = lung, x = T, y = T, dist = "lognormal")
+f2 <- cph(Surv(time, status) ~ age + sex, data = lung, x = T, y = T, surv = TRUE)
+cal1 <- calibrate(f2, cmethod = 'KM', method = "boot", u = 365, m = 50, B = 228)
+```
+
+```{r}
+par(mar = c(8, 5, 3, 2),cex = 1.0)
+plot(cal1, lwd = 2, lty = 1,
+     errbar.col = c(rgb(0, 118, 192, maxColorValue = 255)),
+     xlim = c(0, 1), ylim = c(0, 1),
+     xlab = "Nomograph-Predicted Probs of 1-year DFS",
+     ylab = "Actual 1-year DFS (proportion)",
+     col = c(rgb(192, 98, 83, maxColorValue = 255)))
+```
+

@@ -1,0 +1,103 @@
+---
+title: "NRI and IDI"
+author: "Yi Zhang"
+date: "2023-08-03"
+output: html_document
+---
+
+比较两个模型
+# 计算NRI, Net Reclassification Index
+```{r}
+library(nricens)
+dat = pbc[1:312,]
+dat$sex = ifelse(dat$sex == 'f', 1, 0)
+```
+
+保留大于2000天，或2000天内死亡
+```{r}
+dat = dat[dat$time > 2000 | (dat$time <2000 & dat$status ==2),]
+event = ifelse(dat$time < 2000 & dat$status == 2, 1,0)
+```
+
+```{r}
+z.std <- as.matrix(subset(dat, select = c(age, bili, albumin)))
+z.new <- as.matrix(subset(dat, select = c(age, bili, albumin, protime)))
+```
+
+```{r}
+mstd <- glm(event ~ ., binomial(logit), data.frame(event, z.std), x = TRUE)
+mnew <- glm(event ~ ., binomial(logit), data.frame(event, z.new), x = TRUE)
+```
+
+```{r}
+p.std <- mstd$fitted.values
+p.new <- mstd$fitted.values
+```
+
+```{r}
+nribin(mdl.std = mstd, mdl.new = mnew, cut = c(0.2, 0.4), 
+       niter = 1000, updown = "category")
+```
+## 生存模型NRI
+```{r}
+time <- dat$time
+event <- ifelse(dat$status == 2, 1, 0)
+```
+
+
+```{r}
+mstd <- coxph(Surv(time, event) ~ ., data.frame(time, event, z.std), x = TRUE)
+mnew <- coxph(Surv(time, event) ~ ., data.frame(time, event, z.new), x = TRUE)
+```
+
+```{r}
+p.std <- get.risk.coxph(mstd, t0 = 2000)
+p.new <- get.risk.coxph(mnew, t0 = 2000)
+```
+
+```{r}
+nricens(mdl.std = mstd, mdl.new = mnew, t0 = 2000, cut = c(0.2, 0.4), 
+       niter = 100)
+```
+
+
+# 计算IDI
+## 二分类
+
+```{r}
+event = ifelse(dat$time < 2000 & dat$status == 2, 1,0)
+```
+
+```{r}
+library(survival)
+mstd <- glm(event ~ ., binomial(logit), data.frame(event, z.std), x = TRUE)
+mnew <- glm(event ~ ., binomial(logit), data.frame(event, z.new), x = TRUE)
+pstd <- mstd$fitted.values
+pnew <- mstd$fitted.values
+```
+
+```{r}
+library(PredictABEL)
+dat_new <- cbind(dat, event)
+reclassification(data =dat_new, cOutcome = 21, predrisk1 = pstd, 
+                 predrisk2 = pnew, cutoff = c(0, 0.2, 0.4, 1))
+```
+
+
+## 生存模型
+```{r}
+dat$time = as.numeric(dat$time)
+dat$status = ifelse(dat$status==2, 1, 0)
+t0 = 365*5
+indata0 <- as.matrix(subset(dat, select = c(time, status, age, bili, albumin)))
+indata1 <- as.matrix(subset(dat, select = c(time, status, age, bili, albumin, protime)))
+covs0 <-as.matrix(indata0[,c(-1, -2)])
+covs1 <-as.matrix(indata1[,c(-1, -2)])
+```
+
+```{r}
+library(survIDINRI)
+x <- IDI.INF(dat[, 2:3], covs0, covs1, t0, npert = 1000)
+IDI.INF.OUT(x)
+```
+

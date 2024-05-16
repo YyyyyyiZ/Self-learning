@@ -1,0 +1,80 @@
+---
+title: "DCA"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+**该方法目前并不成熟**
+寻找净获益最大的曲线
+```{r}
+library(rmda)
+Data <- read.csv("F:\\DS\\R\\2.20.Framingham.csv", sep = ',')
+```
+
+```{r}
+simple <- decision_curve(chdfate ~ scl, data = Data,
+                         family = binomial(link = 'logit'),
+                         thresholds = seq(0,1, by = 0.01),
+                         confidence.intervals = 0.95,
+                         study.design = 'case-control',
+                         population.prevalence = 0.3)
+```
+
+```{r}
+complex <- decision_curve(chdfate ~ scl + sbp + dbp + age + bmi + sex, data = Data,
+                         family = binomial(link = 'logit'),
+                         thresholds = seq(0,1, by = 0.01),
+                         confidence.intervals = 0.95,
+                         study.design = 'case-control',
+                         population.prevalence = 0.3)
+```
+
+```{r}
+List <- list(simple, complex)
+```
+
+```{r}
+plot_decision_curve(List,
+                    curve.names = c('simple', 'complex'),
+                    cost.benefit.axis = FALSE, col = c('red', 'blue'),
+                    confidence.intervals = FALSE,
+                    standardize = FALSE)
+```
+
+```{r}
+summary(complex, measure = 'NB')
+```
+
+绘制临床影响曲线
+```{r}
+plot_clinical_impact(simple, population.size = 1000,
+                     cost.benefit.axis = T,
+                     n.cost.benefits = 8,
+                     col = c('red', 'blue'),
+                     confidence.intervals = T,
+                     ylim = c(0,1000),
+                     legend.position = "topright")
+```
+
+```{r}
+plot_clinical_impact(complex, population.size = 1000,
+                     cost.benefit.axis = T,
+                     n.cost.benefits = 8,
+                     col = c('red', 'blue'),
+                     confidence.intervals = T,
+                     ylim = c(0,1000),
+                     legend.position = "topright")
+```
+
+```{r}
+library(MASS)
+source("stdca.R")
+
+data.set <- Melanoma
+data.set$diedcancer = ifelse(data.set$status == 1, 1, 0)
+
+stdca(data = data.set, outcome = "diedcancer", ttoutcome = "time", timepoint = 545,
+      predictors = "thickness", probability = FALSE, xstop = 0.25)
+```
+

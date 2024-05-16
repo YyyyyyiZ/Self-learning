@@ -1,0 +1,159 @@
+---
+title: "20230722_logistic_regression"
+output: html_document
+date: "2023-07-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+library(MASS)
+data(biopsy)
+str(biopsy)
+```
+
+```{r}
+biopsy$ID = NULL
+```
+
+```{r}
+names(biopsy)  =  c("thick", "u.size", "u.shape", "adhsn", 
+                    "s.size", "nucl", "chrom", "n.nuc", "mit", "class")
+```
+
+```{r}
+names(biopsy)
+```
+
+删除16个缺失值
+```{r}
+biopsy.v2 <- na.omit(biopsy)
+```
+
+IF ELSE
+```{r}
+y <- ifelse(biopsy.v2$class == "malignant", 1, 0)
+```
+
+```{r}
+library(reshape2)
+library(ggplot2)
+```
+
+```{r}
+biop.m <- melt(biopsy.v2, id.vars = "class")
+ggplot(data = biop.m, aes(x = class, y = value)) + geom_boxplot() + facet_wrap(~ variable, ncol = 3)
+```
+
+```{r}
+library(corrplot)
+bc <- cor(biopsy.v2[, 1:9])
+corrplot.mixed(bc)
+```
+
+```{r}
+set.seed(123)
+ind <- sample(2, nrow(biopsy.v2), replace = TRUE, prob = c(0.7, 0.3))
+train <- biopsy.v2[ind==1,]
+test <- biopsy.v2[ind==2,]
+str(test)
+```
+
+```{r}
+table(train$class)
+table(test$class)
+```
+
+```{r}
+full.fit <- glm(class ~ ., family = binomial, data = train)
+summary(full.fit)
+confint(full.fit)
+```
+
+```{r}
+exp(coef(full.fit))
+```
+
+```{r}
+library(car)
+vif(full.fit)
+```
+
+```{r}
+train.probs <- predict(full.fit, type = "response")
+train.probs[1:5]  # inspect the first 5 predicted probabilities
+contrasts(train$class)
+```
+
+```{r}
+library(InformationValue)
+trainY <- y[ind==1]
+testY <- y[ind==2]
+confusionMatrix(trainY, train.probs)
+```
+
+```{r}
+misClassError(trainY, train.probs)
+```
+
+```{r}
+test.probs <- predict(full.fit, newdata = test, type = "response")
+misClassError(testY, test.probs)
+confusionMatrix(testY, test.probs)
+```
+
+```{r}
+library(bestglm)
+```
+
+```{r}
+X <- train[, 1:9]
+Xy <- data.frame(cbind(X, trainY))
+bestglm(Xy = Xy, IC = "CV", CVArgs = list(Method = "HTF", K = 10, REP = 1),
+        family = binomial)
+```
+
+```{r}
+reduce.fit <- glm(class ~ thick + u.size + nucl, family = binomial, data = train)
+```
+
+```{r}
+test.cv.probs <- predict(reduce.fit, newdata = test, type = "response")
+misClassError(testY, test.cv.probs)
+confusionMatrix(testY, test.cv.probs)
+```
+
+```{r}
+bestglm(Xy = Xy, IC = "BIC", family = binomial)
+```
+
+```{r}
+bic.fit <- glm(class ~ thick + u.size + nucl + n.nuc,
+               family = binomial, data = train)
+test.bic.probs <- predict(bic.fit, newdata = test, type = "response")
+misClassError(testY, test.bic.probs)
+confusionMatrix(testY, test.bic.probs)
+```
+

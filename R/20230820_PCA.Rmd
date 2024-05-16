@@ -1,0 +1,148 @@
+---
+title: "PCA"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+# 判断主成分个数
+```{r}
+par(ask = TRUE)
+set.seed(1234)
+library(psych)
+```
+碎石图
+```{r}
+fa.parallel(USJudgeRatings[,-1], fa = "pc", n.iter = 100, show.legend = FALSE, 
+            main = "Screen plot with parallel analysis")
+abline(h=1, lwd=1, col="green")
+```
+```{r}
+pc <- principal(USJudgeRatings[,-1], nfactors = 1)
+pc
+```
+```{r}
+fa.parallel(Harman23.cor$cov, n.obs = 302, fa = "pc", n.iter = 100,
+            show.legend = FALSE, main = "Scree plot with parallel analysis")
+abline(h = 1, lwd = 1, col = "green")
+```
+
+```{r}
+pc <- principal(Harman23.cor$cov, nfactors = 2, rotate = "none")
+pc
+```
+
+# 旋转主成分
+```{r}
+rc <- principal(Harman23.cor$cov, nfactors = 2, rotate = "varimax")
+rc
+```
+
+```{r}
+pc <- principal(USJudgeRatings[,-1], nfactors = 1, score = TRUE)
+head(pc$score)
+cor(USJudgeRatings$CONT, pc$score)
+```
+
+
+```{r}
+options(digits = 2)
+covariances <- ability.cov$cov
+correlations <- cov2cor(covariances)
+correlations
+```
+
+```{r}
+fa.parallel(correlations, n.obs = 112, fa = "both", n.iter = 100, 
+            show.legend = FALSE, main = "Scree plots with parallel analysis")
+```
+
+```{r}
+fa <- fa(correlations, nfactors = 2, rotate = "none", fm = "pa")
+fa
+```
+
+```{r}
+fa.varimax <- fa(correlations, nfactors = 2, rotate = "varimax", fm = "pa")
+fa.varimax
+```
+
+# 提取主成分
+
+# Case
+```{r}
+library(ggplot2)
+library(psych)
+train <- read.csv("F:\\DS\\R\\NHLtrain.csv")
+test <- read.csv("F:\\DS\\R\\NHLtest.csv")
+```
+
+```{r}
+train.scale <- scale(train[,-1:-2])
+nhl.cor <- cor(train.scale)
+cor.plot(nhl.cor)
+```
+
+```{r}
+pca <- principal(train.scale, rotate = "none")
+plot(pca$values, type = "b", ylab = "Eigenvalues", xlab = "component")
+```
+
+```{r}
+fa.parallel(train.scale, n.obs = 30, fa = "pc", n.iter = 100, 
+            show.legend = FALSE, main = "Scree plots with parallel analysis")
+```
+
+```{r}
+pca.rotate <- principal(train.scale, nfactors = 5, rotate = "varimax")
+pca.rotate
+```
+
+```{r}
+pca.scores <- data.frame(pca.rotate$scores)
+pca.scores$ppg <- train$ppg
+```
+
+```{r}
+nhl.lm <- lm(ppg ~., data = pca.scores)
+summary(nhl.lm)
+```
+
+```{r}
+nhl.lm2 <- lm(ppg ~ RC1 + RC2, data = pca.scores)
+summary(nhl.lm2)
+```
+
+```{r}
+plot(nhl.lm2$fitted.values, train$ppg, main = "Predicted vs. Actual",
+     xlab = "Predicted", ylab = "Actual")
+```
+
+```{r}
+train$pred <- round(nhl.lm2$fitted.values, digits = 2)
+p <- ggplot(train, aes(x = pred, y = ppg, label = Team))
+p + geom_point() + geom_text(size = 3.5, hjust = 0.1, vjust = 0.5, angle = 0) + 
+  xlim(0.8, 1.4) + ylim(0.8, 1.5) + stat_smooth(method = "lm", se = FALSE)
+```
+
+```{r}
+sqrt(mean(nhl.lm2$residuals^2))
+```
+
+```{r}
+test.scores <- data.frame(predict(pca.rotate, test[,c(-1:-2)]))
+test.scores$pred <- predict(nhl.lm2, test.scores)
+test.scores$ppg <- test$ppg
+test.scores$Team <- test$Team
+```
+
+```{r}
+p <- ggplot(test.scores, aes(x = pred, y = ppg, label = Team))
+p + geom_point() + geom_text(size = 3.5, hjust = 0.1, vjust = 0.5, angle = 35) + 
+  xlim(0.8, 1.4) + ylim(0.8, 1.5) + stat_smooth(method = "lm", se = FALSE)
+```
+
+```{r}
+resid <- test.scores$ppg - test.scores$pred
+sqrt(mean(resid^2))
+```

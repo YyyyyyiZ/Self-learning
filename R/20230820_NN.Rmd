@@ -1,0 +1,155 @@
+---
+title: "Neural Network"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+```{r}
+library(caret)
+library(MASS)
+library(neuralnet)
+library(vcd)
+data(shuttle)
+str(shuttle)
+```
+
+```{r}
+table(shuttle$use)
+```
+
+```{r}
+table1 <- structable(wind + magn ~ use, shuttle)
+table1
+mosaic(table1, shade = T)
+```
+
+```{r}
+mosaic(use ~ error + vis, shuttle)
+```
+NN要求所有响应变量和协变量都是数值型
+```{r}
+dummies <- dummyVars(use ~ ., shuttle, fullRank = 1)
+dummies
+```
+
+```{r}
+shuttle.2 <- data.frame(predict(dummies, newdata = shuttle))
+shuttle.2$use <- ifelse(shuttle$use == "auto", 1, 0)
+names(shuttle.2)
+head(shuttle.2)
+```
+
+```{r}
+set.seed(820)
+trainIndex <- createDataPartition(shuttle.2$use, p = 0.7, list = F)
+shuttleTrain <- shuttle.2[trainIndex,]
+shuttleTest <- shuttle.2[-trainIndex,]
+```
+
+```{r}
+n <- names(shuttleTrain)
+form <- as.formula(paste("use ~", paste(n[!n %in% "use"], collapse = " + ")))
+form
+```
+
+hidden 每层中隐藏神经元的数量，最多3个隐藏层
+act.fct 激活函数，默认为logistic，可改为tanh
+err.fct 计算误差，默认为sse，ce为交叉熵
+linear.output 逻辑参数，控制是否忽略act.fct，默认为TRUE
+```{r}
+set.seed(820)
+fit <- neuralnet(form, data = shuttleTrain, hidden = c(2, 1), err.fct = "ce",
+                 linear.output = F)
+fit$result.matrix
+```
+
+```{r}
+head(fit$generalized.weights[[1]])
+```
+
+```{r}
+plot(fit)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+gwplot(fit, selected.covariate = "vis.yes")
+gwplot(fit, selected.covariate = "wind.tail")
+```
+```{r}
+resultsTrain <- compute(fit, shuttleTrain[, 1:16])
+predTrain <- resultsTrain$net.result
+predTrain <- ifelse(predTrain >= 0.5, 1, 0)
+table(predTrain, shuttleTrain$use)
+```
+
+```{r}
+resultsTest <- compute(fit, shuttleTest[,1:16])
+predTest <- resultsTest$net.result
+predTest <- ifelse(predTest >= 0.5, 1, 0)
+table(predTest, shuttleTest$use)
+```
+
+```{r}
+which(predTest == 1 & shuttleTest$use == 0)
+```
+```{r Case2}
+library(mlbench)
+library(neuralnet)
+
+data(BreastCancer)
+```
+
+```{r}
+mvindex <-unique(unlist(lapply(BreastCancer, function(x) which (is.na(x)))))
+mvindex
+```
+
+```{r}
+data_cleaned <- na.omit(BreastCancer)
+boxplot(data_cleaned[,2:10])
+hist(as.numeric(data_cleaned$Mitoses))
+par(mfrow = c(3, 3))
+hist(as.numeric(data_cleaned$Cl.thickness))
+```
+因子变量与分类变量的的数值化
+可参考上一种方法
+```{r}
+input <- data_cleaned[, 2:10]
+index <- sapply(input, is.factor)
+input <- as.data.frame(lapply(input, function(x) as.numeric(as.character(x))))
+max_data <- apply(input, 2, max)
+min_data <- apply(input, 2 ,min)
+input_scaled <- as.data.frame(scale(input, center = min_data, 
+                                    scale = max_data - min_data))
+View(input_scaled)
+```
+
+```{r}
+Cancer <- data_cleaned$Class
+Cancer <- as.data.frame(Cancer)
+Cnacer <- with(Cancer, data.frame(model.matrix(~Cancer+0)))
+final_data <- as.data.frame(cbind(input_scaled, Cancer))
+```
+
+```{r}
+index <- sample(1:nrow(final_data), round(0.7 * nrow(final_data)))
+train_data <- as.data.frame(final_data[index,])
+test_data <-as.data.frame(final_data[-index,])
+n = names(final_data[1:9])
+f <- as.formula(paste("Cancer ~ ", paste(n, collapse = " + ")))
+```
+
+```{r}
+net = neuralnet(f, data = train_data, hidden = 5, linear.output = F)
+plot(net)
+```
+```{r}
+predict_net_test <- compute(net, test_data[,1:9])
+predict_result <- round(predict_net_test$net.result, digits = 0)
+net.prediction = c("benign", "malignant")[apply(predict_result, 1, which.max)]
+predict.table <- table(data_cleaned$Class[-index], net.prediction)
+predict.table
+```
+

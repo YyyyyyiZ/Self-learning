@@ -1,0 +1,266 @@
+---
+title: "Trees"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+```{r}
+library(rpart)
+library(partykit)
+library(MASS)
+library(ElemStatLearn) # prostatdata
+library(randomForest)
+library(xgboost)
+library(caret)
+library(rpart)
+```
+
+
+# 回归树
+```{r}
+prostate <- read.csv("F:\\DS\\R\\prostate.csv")
+prostate$gleason <- ifelse(prostate$gleason == 6, 0, 1)
+pros.train <- subset(prostate, train == TRUE)[, 1:9]
+pros.test <- subset(prostate, train == FALSE)[, 1:9]
+```
+
+```{r}
+set.seed(820)
+tree.pros <- rpart::rpart(lpsa ~ ., data = pros.train)
+tree.pros$cptable
+```
+CP为成本复杂性函数，nsplit为分裂次数
+rel error表示相对误差，xerror是十折交叉验证的平均误差，xstd是交叉验证过程中的标准差
+可以看出，5次分裂在整个数据集上产生的误差最小，使用交叉验证也是分裂5次
+
+```{r}
+rpart::plotcp(tree.pros)
+```
+
+```{r}
+cp <- min(tree.pros$cptable[5,])
+prune.tree.pros <- rpart::prune(tree.pros, cp=cp)
+plot(as.party(tree.pros))
+```
+
+```{r}
+plot(as.party(prune.tree.pros))
+```
+
+```{r}
+party.pros.test <- predict(prune.tree.pros, newdata = pros.test)
+rpart.resid <- party.pros.test - pros.test$lpsa
+mean(rpart.resid^2)
+```
+
+# 分类树
+```{r}
+data("biopsy")
+biopsy <- biopsy[, -1]
+names(biopsy) <- c("thick", "u.size", "u.shape", "adhsn", "s.size", "nucl", 
+                   "chrom", "n.nuc", "mit", "class")
+biopsy.v2 <- na.omit(biopsy)
+set.seed(820)
+ind <- sample(2, nrow(biopsy.v2), replace = TRUE, prob = c(0.7, 0.3))
+biop.train <- biopsy.v2[ind == 1,]
+biop.test <- biopsy.v2[ind == 2,]
+```
+
+```{r}
+set.seed(820)
+tree.biop <- rpart::rpart(class ~ ., data = biop.train)
+tree.biop$cptable
+```
+
+```{r}
+cp <- min(tree.pros$cptable[3,])
+prune.tree.biop <- rpart::prune(tree.biop, cp=cp)
+plot(as.party(tree.biop))
+```
+
+```{r}
+rparty.test <- predict(prune.tree.biop, newdata = biop.test, type = "class")
+table(rparty.test, biop.test$class)
+```
+
+# 随机森林
+## 随机森林回归
+```{r}
+set.seed(820)
+rf.pros <- randomForest(lpsa ~ ., data = pros.train)
+rf.pros
+plot(rf.pros)
+```
+
+```{r}
+which.min(rf.pros$mse)
+```
+```{r}
+set.seed(820)
+rf.pros.2 <- randomForest(lpsa ~ ., data = pros.train, ntree = 200)
+rf.pros.2
+```
+
+```{r}
+varImpPlot(rf.pros.2, scale = TRUE, main = "Variable Importance Plot-PSA Score")
+```
+
+```{r}
+importance(rf.pros.2)
+```
+
+```{r}
+rf.pros.test <- predict(rf.pros.2, newdata = pros.test)
+rf.resid <- rf.pros.test - pros.test$lpsa
+mean(rf.resid^2)
+```
+## 随机森林分类
+```{r}
+rf.biop <- randomForest(class ~ ., data = biop.train)
+plot(rf.biop)
+```
+
+```{r}
+which.min(rf.biop$err.rate[,1])
+```
+
+```{r}
+rf.biop.2 <- randomForest(class ~ ., data = biop.train, ntree = 250)
+rf.biop.test <- predict(rf.biop.2, newdata = biop.test, type = "response")
+table(rf.biop.test, biop.test$class)
+```
+
+```{r}
+varImpPlot(rf.biop.2)
+```
+
+```{r}
+importance(rf.biop.2)
+```
+
+
+# 梯度提升
+```{r 定义参数网格}
+grid <- expand.grid(
+  nrounds = c(75, 100), # 最大迭代次数
+  colsample_bytree = 1, # 建立树时随机抽取的特征数量，用一个比率表示，默认为1
+  min_child_weight = 1, # 对树进行提升时使用的最小权重，默认为1
+  eta = c(0.01, 0.1, 0.3), # 学习率
+  gamma = c(0.5, 0.25), # 在树中新增一个叶子分区时所需的最小减损
+  subsample = 0.5, # 子样本数据占整个观测的比率，默认为1
+  max_depth = c(2, 3) # 每棵树的最大深度
+)
+grid
+```
+
+```{r}
+cntrl <- trainControl(
+  method = 'cv',
+  number = 5,
+  verboseIter = FALSE,
+  returnData = FALSE,
+  returnResamp = "final"
+)
+```
+
+```{r}
+pima <- rbind(Pima.tr, Pima.te)
+pima.scale <- data.frame(scale(pima[, -8]))
+pima.scale$type <- pima$type
+pima.scale.melt <- melt(pima.scale, id.var = "type")
+set.seed(1)
+ind <- sample(2, nrow(pima.scale), replace = TRUE, prob = c(0.7, 0.3))
+pima.train <- pima.scale[ind == 1,]
+pima.test <- pima.scale[ind == 2,]
+```
+
+
+```{r}
+set.seed(820)
+train.xgb <- caret::train(
+  x = pima.train[,1:7],
+  y = pima.train[,8],
+  trControl = cntrl,
+  tuneGrid = grid,
+  method = "xgbTree"
+)
+```
+
+```{r}
+train.xgb
+```
+
+```{r}
+param <- list(objective = "binary:logistic",
+              booster = "gbtree",
+              eval_metric = "error",
+              eta = 0.01,
+              max_depth = 3,
+              subsample = 0.5,
+              colsample_bytree = 1,
+              gamma = 0.5)
+
+x <- as.matrix(pima.train[,1:7])
+y <- ifelse(pima.train$type == "Yes", 1, 0)
+train.mat <- xgb.DMatrix(data = x, label = y)
+```
+
+```{r}
+set.seed(820)
+xgb.fit <- xgb.train(params = param, data = train.mat, nrounds = 75)
+xgb.fit
+pred <- predict(xgb.fit, x)
+```
+
+```{r}
+impMatrix <- xgb.importance(feature_names = dirnames(x)[[2]], model = xgb.fit)
+impMatrix
+xgb.plot.importance(impMatrix, main = "Gain by Feature")
+```
+
+```{r}
+library(Informationvalue)
+pred <- predict(xgb.fit, x)
+optimalCutoff(y, pred)
+pima.testMat <- as.matrix(pima.test[,1:7])
+xgb.pima.test <- predict(xgb.fit, pima.testMat)
+y.test <- ifelse(pima.test$type == "Yes", 1, 0)
+optimalCutoff(y.test, xgb.pima.test)
+```
+
+```{r}
+confusionMatrix(y.test, xgb.pima.test, threshold = 0.39)
+1 - misClassError(y.test, xgb.pima.test, threshold = 0.39)
+```
+
+```{r}
+plotROC(y.test, xgb.pima.test)
+```
+
+# 使用随机森林进行特征选择
+```{r}
+data(Sonar, package = "mlbench")
+dim(Sonar)
+table(Sonar$Class)
+```
+
+```{r}
+library(Boruta)
+set.seed(820)
+feature.selection <- Boruta(Class ~ ., data = Sonar, doTrace = 1)
+```
+
+```{r}
+feature.selection$timeTaken
+```
+
+```{r}
+table(feature.selection$finalDecision)
+```
+
+```{r}
+fNames <- getSelectedAttributes(feature.selection)
+Sonar.features <- Sonar[, fNames]
+dim(Sonar.features)
+```

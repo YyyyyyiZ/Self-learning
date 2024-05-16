@@ -1,0 +1,133 @@
+---
+title: "clustering"
+author: "Yi Zhang"
+date: "2023-08-20"
+output: html_document
+---
+
+选择合适的聚类变量
+缩放数据
+寻找异常值
+计算距离
+选择聚类算法---K均值/基于中心点的划分(PAM)
+获得一种或多种聚类方法
+确定类的数目
+获得最终聚类方案
+可视化
+
+```{r}
+library(cluster)
+library(compareGroups)
+library(HDclassif)
+library(NbClust)
+library(sparcl)
+```
+
+```{r}
+data(wine)
+str(wine)
+```
+
+```{r}
+names(wine) <- c("Class", "Alcohol", "MalicAcid", "Ash", "Alk_ash", 
+                 "magnesium", "T_phenols", "Flavanoids", "Non_flav",
+                 "Proantho", "C_Intensity", "Hue", "OD280_315", "Proline")
+```
+
+缩放数据
+```{r}
+df <- as.data.frame(scale(wine[,-1]))
+table(wine$Class)
+```
+
+层次聚类
+```{r}
+numComplete <- NbClust(df, distance = "euclidean", min.nc = 2, max.nc = 6,
+                       method = "complete", index = "all")
+```
+
+```{r}
+numComplete$Best.nc
+```
+
+```{r}
+dis <- dist(df, method = "euclidean")
+hc <- hclust(dis, method = "complete")
+plot(hc, hang = -1, labels = FALSE, main = "complete linkage")
+```
+
+```{r}
+comp3 <- cutree(hc, 3)
+ColorDendrogram(hc, y = comp3, main = "complete", branchlength = 50)
+```
+
+
+```{r}
+aggregate(wine[,-1], list(comp3), mean)
+```
+
+```{r}
+par(mfrow = c(1,2))
+boxplot(wine$Proline ~ comp3, main = "Proline by Complete Linkage")
+```
+
+```{r}
+numKmeans <- NbClust(df, min.nc = 2, max.nc = 15, method = "kmeans")
+```
+
+```{r}
+set.seed(1234)
+km <- kmeans(df, 3, nstart = 25)
+table(km$cluster)
+```
+
+```{r}
+km$centers
+```
+
+```{r}
+boxplot(wine$Alcohol ~ km$cluster, main = "Alcohol Content, K-Means")
+```
+
+```{r}
+table(km$cluster, wine$Class)
+```
+
+果瓦系数和PAM法
+```{r}
+wine$Alcohol <- as.factor(ifelse(df$Alcohol >0, "High", "Low"))
+disMatrix <- daisy(wine[,-1], metric = "gower")
+set.seed(123)
+pamFit <- pam(disMatrix, k = 3)
+table(pamFit$clustering)
+table(pamFit$clustering, wine$Class)
+```
+
+```{r}
+library(randomForest)
+set.seed(1)
+rf <- randomForest(x = wine[,-1], ntree = 200, proximity = 1)
+rf
+```
+
+```{r}
+dim(rf$proximity)
+rf$proximity[1:5, 1:5]
+```
+
+```{r}
+importance(rf)
+```
+
+随机森林计算距离
+```{r}
+dissMat <- sqrt(1 - rf$proximity)
+dissMat[1:2, 1:2]
+```
+
+```{r}
+set.seed(123)
+pamRF <- pam(dissMat, k = 3)
+table(pamRF$clustering, wine$Class)
+```
+

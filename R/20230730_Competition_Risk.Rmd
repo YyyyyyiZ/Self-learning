@@ -1,0 +1,50 @@
+---
+title: "竞争风险模型"
+author: "Yi Zhang"
+date: "2023-07-30"
+output: html_document
+---
+
+```{r}
+library(foreign)
+bmt <- read.csv("F:\\DS\\R\\bmtcrr.csv")
+head(bmt)
+```
+单因素风险分析
+```{r}
+library(survival)
+library(cmprsk)
+library(splines)
+attach(bmt)
+# 时间 结局 因子变量
+crmod <- cuminc(ftime, Status, D) #构建单因素生存函数 
+crmod
+```
+
+```{r}
+# 0=删失，1=复发，2=竞争风险事件
+plot(crmod, xlab = 'month', ylab = 'CIF', 
+     col = c("red", "blue", "orange", "forestgreen"))
+```
+竞争风险模型
+```{r}
+cov1 <- data.frame(age = bmt$Age,
+                   sex_F = ifelse(bmt$Sex=='F', 1, 0),
+                   dis_AML = ifelse(bmt$D=='AML', 1, 0),
+                   phase_cr1 = ifelse(bmt$Phase=='CR1', 1, 0),
+                   phase_cr2 = ifelse(bmt$Phase=='CR2', 1, 0),
+                   phase_cr3 = ifelse(bmt$Phase=='CR3', 1, 0),
+                   source_PB = ifelse(bmt$Source=='PB', 1, 0))
+cov1
+```
+
+```{r}
+mod1 <- crr(bmt$ftime, bmt$Status, cov1, failcode = 1, cencode = 0)
+summary(mod1)
+```
+检验是否比空模型好
+```{r}
+library(aod)
+wald.test(mod1$var, mod1$coef, Terms = 4:6)
+```
+

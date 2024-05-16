@@ -1,0 +1,49 @@
+---
+title: "multi-variable"
+author: "Yi Zhang"
+date: "2023-08-01"
+---
+
+# 变量筛选思路
+先做单因素分析，P-value显著的变量放入多元回归方程
+危险因素研究：根据暴露因素（X）效应值的影响筛选协变量
+最优子集，lasso
+条件参数估计似然比检验
+最大偏似然估计的似然比检验
+Wald卡方检验
+可决系数、AIC、BIC、似然比对数、C-statistics
+
+# 亚组分析
+在全数据集中按照某种因素把全部数据集分为若干个亚数据集
+在亚数据集中比较实验组和对照组的差异
+http://www.360doc.com/content/22/0303/13/51978634_1019806962.shtml
+```{r}
+library(forestplot)
+rs_forest <- read.csv('abiraterone.csv', header = False)
+tiff('Figure1.tiff', height = 6000, width = 7000, res = 600)
+```
+
+```{r}
+forestplot(labeltext = as.matrix(rs_forest[,1:4]),
+           mean = rs_forest$V5,
+           lower = rs_forest$V6,
+           upper = rs_forest$V7,
+           is.summary = c(T,T,T,F,F,T,F,F,T,F,F,T,F,F,F,T,F,F,T,F,F,T,F,F,T,F,F),
+           zero = 1,  # 设置参照值
+           boxsize = 0.3,
+           lineheight = unit(8,'mm'), # 行距
+           colgap = unit(2,'mm'),
+           lwd.zero = 2, # 参考线的粗细
+           lwd.ci = 2, # 区间估计线的粗细
+           col = fpColors(box = '#458B00', summary = '#8B008B',lines = 'black',zero = '#7AC5CD'),
+           xlab = "The estimates",
+           lwd.xaxis = 2,
+           lty.ci = "solid",
+           graph.pos = 4) # 图在第几列
+```
+
+# 敏感性分析
+```{r}
+
+```
+

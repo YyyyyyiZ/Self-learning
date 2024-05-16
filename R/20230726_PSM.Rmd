@@ -1,0 +1,77 @@
+---
+title: "PSM"
+author: "Yi Zhang"
+date: "2023-07-26"
+output: html_document
+---
+
+MatchIt
+```{r}
+library(MatchIt)
+data(lalonde)
+head(lalonde)
+View(lalonde)
+```
+```{r}
+lalonde$black <- ifelse(lalonde$race=='black', 1, 0)
+lalonde$hispan <- ifelse(lalonde$race=='hispan', 1, 0)
+```
+
+```{r}
+f <- matchit(treat ~ re74 + re75 + educ + black + hispan + age + married + nodegree, data = lalonde, method = "nearest")
+summary(f)
+```
+```{r}
+f <- matchit(treat ~ re74 + re75 + educ + black + hispan + age + married + nodegree, data = lalonde, method = "nearest", capliper = 0.05)
+summary(f)
+```
+
+```{r}
+matchdata <- match.data(f)
+matchdata
+```
+
+```{r}
+library(foreign)
+matchdata$id <- 1:nrow(matchdata)
+write.dta(matchdata, "matchdata.dta")
+write.csv(matchdata, "matchdata.csv")
+```
+
+nonrandom
+```{r}
+library(nonrandom)
+data(stu1)
+```
+
+```{r}
+stu1.ps <- pscore(data = stu1,formula = therapie ~ tgr + age)
+stu1.match <-  ps.match(object = stu1.ps,
+                        ratio = 2,
+                        caliper = 0.05,
+                        givenTmatchingC =  FALSE,
+                        matched.by = "pscore",
+                        setseed = 123,
+                        combine.output = TRUE)
+```
+
+```{r}
+matchdata <- stu1.match$data.matched
+matchdata
+```
+
+```{r}
+plot.pscore(x = stu1.ps,
+            main = "PS distribution",
+            xlab = "",
+            par.1 = list(col = "red"),
+            par.0 = list(lwd = 2),
+            par.dens = list(kernel = "gaussian"))
+```
+
+```{r}
+library(foreign)
+matchdata$id <- 1:nrow(matchdata)
+write.dta(matchdata, "matchdata.dta")
+```
+

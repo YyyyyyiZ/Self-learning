@@ -1,0 +1,49 @@
+---
+title: "Log Rank"
+author: "Yi Zhang"
+date: "2023-07-29"
+output: html_document
+---
+
+```{r}
+library(survival)
+library(ISwR)
+attach(melanom)
+names(melanom)
+```
+
+```{r}
+surv.all <- survfit(Surv(days, status == 1)~1)
+summary(surv.all)
+```
+
+```{r}
+plot(surv.all, col = "blue")
+```
+
+```{r}
+surv.bysex <- survfit(Surv(days, status == 1)~sex)
+plot(surv.bysex, conf.int = T, col = c("red", "blue"), ylab = "OS", xlab = "days")
+# legend(locator(n = 1), legend = c("male", "female"), lty = 1, col = c("blue", "red"))
+```
+
+log-rank test
+```{r}
+f1 <- survdiff(Surv(days, status == 1)~sex, rho = 0)
+f1
+# ulc的均值，控制ulc对y的影响
+f2 <- survdiff(Surv(days, status == 1)~sex + strata(ulc))
+f2
+```
+
+cox regression
+分析各种因素对生存时间的影响
+```{r}
+summary(coxph(Surv(days, status == 1)~sex))
+summary(coxph(Surv(days, status == 1)~sex + log(thick) + strata(ulc)))
+plot(survfit(coxph(Surv(days, status == 1)~log(thick) + sex + strata(ulc))), 
+     col = c("red", "blue"))
+# legend(locator(n = 1), legend = c("ulceration present", "ulceration absent"), 
+#       lty = 1, col = c("red", "blue"))
+```
+

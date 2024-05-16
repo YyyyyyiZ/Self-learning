@@ -1,0 +1,146 @@
+---
+title: "Nomogram"
+author: "Yi Zhang"
+date: "2023-08-02"
+output: html_document
+---
+
+```{r}
+library(rms)
+library(foreign)
+```
+
+```{r}
+mydata <- read.spss("lweight.sav")
+mydata <- as.data.frame(mydata)
+head(mydata)
+```
+
+```{r}
+mydata$low <- ifelse(mydata$low == "低出生体重", 1, 0)
+mydata$race1 <- ifelse(mydata$low == "白种人", 1, 0)
+mydata$race2 <- ifelse(mydata$low == "黑种人", 1, 0)
+mydata$race3 <- ifelse(mydata$low == "其他种族", 1, 0)
+```
+
+```{r}
+attach(mydata)
+dd <- datadist(mydata)
+options(datadist = 'dd')
+```
+
+```{r}
+fit1 <- lrm(low ~ age + ftv + ht + lwt + ptl + smoke + ui + race2 + race3, 
+            data = mydata, x = T, y = T)
+fit1
+summary(fit1)
+```
+
+# 绘制列线图
+```{r}
+nom1 <- nomograph(fit1, fun = plogis, fun.at = c(.001, .01, .05, 
+                                                 seq(.1, .9, by = 1),
+                                                 .95, .99, .999),
+                  lp = F, # close linear predictor
+                  funlabel = "Low weight rate")
+plot(nom1)
+```
+
+# 绘制校准曲线
+```{r}
+cal1 <- calibrate(fit1, cmethod = 'hare', method  = 'boot', B = 1000)
+plot(cal1, xlim = c(0, 1, 0), ylim = c(0, 1, 0))
+```
+
+# 计算C-statistics
+C-statisc即AUC
+站在discrimination角度去评价模型
+```{r}
+mydata$predvalue <- predict(fit1)
+library(ROCR)
+pred <- prediction(mydata$predvalue, mydata$low)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf)
+abline(0, 1)
+auc <- performance(pred, "auc")
+auc
+```
+
+另一种计算方法
+```{r}
+somers2(mydata$predvalue, mydata$low)
+```
+
+# 计算C-index
+```{r}
+age <- rnorm(200, 50, 5)
+bp <- rnorm(200, 120, 10)
+d.time <- rexp(200)
+cens <- runif(200, .5, 2)
+death <- d.time <= cens
+os <-pmin(d.time, cens)
+sample.data <- data.frame(age = age, bp = bp, os =os, death= death)
+View(sample.data)
+```
+
+方法一 survival包
+```{r}
+library(survival)
+fit <- coxph(Surv(os, death) ~ age + bp, data = sample.data)
+sum.surv  <- summary(fit)
+c_index <- sum.surv$concordance
+c_index
+```
+
+方法二 rms包
+```{r}
+library(rms)
+set.seed(1)
+# 打包数据
+dd <- datadist(sample.data)
+options(datadist = 'dd')
+fit.cph <- cph(Surv(os, death) ~ age + bp, data = sample.data, 
+               x = TRUE, y =TRUE, surv  = TRUE)
+fit.cph
+```
+
+```{r}
+v <- validate(fit.cph, dxy = TRUE, B = 1000)
+Dxy <- v[rownames(v) == "Dxy", colnames(v) == "index.corrected"]
+orig_Dxy = v[rownames(v) == "Dxy", colnames(v) == "index.orig"]
+```
+
+计算校正后的C-index
+orig为未校正
+```{r}
+bias_corrected_c_index <- abs(Dxy)/2+0.5
+orig_c_index <- abs(orig_Dxy)/2+0.5
+bias_corrected_c_index
+orig_c_index
+```
+
+剔除fit1中不显著的变量
+将race变为二分类
+```{r}
+mydata$race <- as.factor(ifelse(mydata$race = "白种人", "白种人", "黑人及其他"))
+dd <- datadist(mydata)
+options(datadist = 'dd')
+fit2 <- lrm(low ~ ht + lwt + ptl + smoke + race, data = mydata, x = T, y = T)
+fit2
+summary(fit2)
+```
+
+```{r}
+nom2 <- nomograph(fit2, fun = plogis, fun.at = c(.001, .01, .05, 
+                                                 seq(.1, .9, by = 1),
+                                                 .95, .99, .999),
+                  lp = F, # close linear predictor
+                  funlabel = "Low weight rate")
+plot(nom2)
+```
+
+```{r}
+cal2 <- calibrate(fit2, cmethod = 'hare', method  = 'boot', B = 1000)
+plot(cal1, xlim = c(0, 1, 0), ylim = c(0, 1, 0))
+```
+

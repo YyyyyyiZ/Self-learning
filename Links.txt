@@ -1,0 +1,25 @@
+Markdown
+https://www.bilibili.com/video/BV1NT411C7wS/?spm_id_from=333.999.0.0&vd_source=58ed1bfb84df3b6a4e0bfd7013e4bc87
+
+Deep learning---Andrew Ng
+https://www.coursera.org/learn/neural-networks-deep-learning
+
+Machine learning---Andrew Ng
+https://www.coursera.org/specializations/machine-learning-introduction
+
+Algorithm---Robert Sedgewick
+https://www.coursera.org/learn/algorithms-part1
+https://www.coursera.org/learn/algorithms-part2
+
+Google data analysis---Google
+https://www.coursera.org/professional-certificates/google-data-analytics
+
+R Language
+https://www.bilibili.com/video/BV1jZ4y1V7nZ/?spm_id_from=333.999.0.0&vd_source=58ed1bfb84df3b6a4e0bfd7013e4bc87
+https://www.bilibili.com/video/BV1pG4y1G7gb/?spm_id_from=333.999.0.0&vd_source=58ed1bfb84df3b6a4e0bfd7013e4bc87
+
+Game thoery
+https://oyc.yale.edu/introduction-psychology/psyc-110
+
+Psychology
+https://oyc.yale.edu/economics/econ-159
